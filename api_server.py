@@ -28,7 +28,7 @@ from typing import Optional
 
 import torch
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 
@@ -71,7 +71,7 @@ app.add_middleware(
 
 
 @app.post("/generate", tags=["generation"])
-async def generate_3d_model(request: GenerationRequest):
+async def generate_3d_model(raw_request: Request):
     """
     Generate a 3D model from an input image.
     
@@ -83,8 +83,7 @@ async def generate_3d_model(request: GenerationRequest):
     """
     logger.info("Worker generating...")
     
-    # Convert Pydantic model to dict for compatibility
-    params = request.dict()
+    params = await raw_request.json()
     
     uid = uuid.uuid4()
     try:
@@ -115,8 +114,8 @@ async def generate_3d_model(request: GenerationRequest):
         return JSONResponse(ret, status_code=404)
 
 
-@app.post("/send", response_model=GenerationResponse, tags=["generation"])
-async def send_generation_task(request: GenerationRequest):
+@app.post("/send", tags=["generation"])
+async def send_generation_task(raw_request: Request):
     """
     Send a 3D generation task to be processed asynchronously.
     
@@ -128,8 +127,7 @@ async def send_generation_task(request: GenerationRequest):
     """
     logger.info("Worker send...")
     
-    # Convert Pydantic model to dict for compatibility
-    params = request.dict()
+    params = await raw_request.json()
     
     uid = uuid.uuid4()
     try:

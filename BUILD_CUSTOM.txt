@@ -1,0 +1,24 @@
+=== Hunyuan3D-2.1 C++ 扩展编译 ===
+
+前提: PyTorch 2.13 nightly cu132 已装好
+
+[0] 下载安装 CUDA 13.2（不要覆盖 12.5）
+    https://developer.download.nvidia.com/compute/cuda/13.2.0/local_installers/cuda_13.2.0_win64.exe
+
+[1] 设置环境变量
+    $env:CUDA_PATH = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2"
+    $env:CUDAHOSTCXX = "cl.exe"
+    $env:TORCH_CUDA_ARCH_LIST = "12.0"
+
+[2] 编译 custom_rasterizer
+    cd G:\GitHub\Hunyuan3D-2.1
+    uv pip install -e hy3dpaint\custom_rasterizer --no-build-isolation --python ".venv\Scripts\python.exe"
+
+[3] 编译 DifferentiableRenderer
+    uv pip install -e hy3dpaint\DifferentiableRenderer --no-build-isolation --python ".venv\Scripts\python.exe"
+
+[4] 下载 RealESRGAN 权重
+    curl -L -o hy3dpaint\ckpt\RealESRGAN_x4plus.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
+
+[5] 启动 API Server
+    .venv\Scripts\python.exe api_server.py --port 8081 --low_vram_mode
