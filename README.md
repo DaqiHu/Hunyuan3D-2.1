@@ -182,6 +182,110 @@ We would like to thank the contributors to
 the [TripoSG](https://github.com/VAST-AI-Research/TripoSG), [Trellis](https://github.com/microsoft/TRELLIS),  [DINOv2](https://github.com/facebookresearch/dinov2), [Stable Diffusion](https://github.com/Stability-AI/stablediffusion), [FLUX](https://github.com/black-forest-labs/flux), [diffusers](https://github.com/huggingface/diffusers), [HuggingFace](https://huggingface.co), [CraftsMan3D](https://github.com/wyysf-98/CraftsMan3D), [Michelangelo](https://github.com/NeuralCarver/Michelangelo/tree/main), [Hunyuan-DiT](https://github.com/Tencent-Hunyuan/HunyuanDiT), and [HunyuanVideo](https://github.com/Tencent-Hunyuan/HunyuanVideo) repositories, for their open research and
 exploration.
 
+## Local Deployment (Windows + RTX 5090)
+
+### Prerequisites
+
+- Windows 11
+- NVIDIA RTX 5090 (32GB VRAM) with CUDA 13.2
+- Visual Studio 2022 (MSVC v143)
+- `uv` package manager
+
+### Setup
+
+```powershell
+# 1. Create venv and install PyTorch nightly (supports sm_120)
+uv venv --python 3.11
+uv pip install torch==2.13.0.dev20260522 torchvision==0.28.0.dev20260522 torchaudio==2.11.0.dev20260522 --index-url https://download.pytorch.org/whl/nightly/cu132 --python ".venv\Scripts\python.exe"
+
+# 2. Install dependencies
+uv pip install -r requirements.txt --python ".venv\Scripts\python.exe"
+
+# 3. Build custom_rasterizer CUDA extension
+$env:CUDA_PATH = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2"
+$env:TORCH_CUDA_ARCH_LIST = "8.0;8.6;9.0"
+cd hy3dpaint\custom_rasterizer
+..\..\.venv\Scripts\python.exe setup.py build_ext --inplace
+
+# 4. Copy .pyd to package
+Copy-Item custom_rasterizer_kernel.cp311-win_amd64.pyd -Destination custom_rasterizer\ -Force
+cd ..\..
+
+# 5. Download model weights
+.venv\Scripts\python.exe -c @"
+from huggingface_hub import hf_hub_download
+path = hf_hub_download(
+    repo_id='tencent/Hunyuan3D-2.1',
+    filename='hunyuan3d-dit-v2-1/model.fp16.ckpt',
+    local_dir=r'$env:USERPROFILE\.cache\hy3dgen\tencent\Hunyuan3D-2.1')
+print(f'OK: {path}')
+"@
+```
+
+### Start API Server
+
+```powershell
+$env:CUDA_PATH = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2"
+.venv\Scripts\python.exe api_server.py --port 8081
+```
+
+Server listens on `http://0.0.0.0:8081`.
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/generate` | Image → 3D GLB (sync) |
+| POST | `/send` | Image → 3D (async, returns task ID) |
+| GET | `/health` | Health check |
+| GET | `/status/{uid}` | Check generation status |
+
+### BlenderMCP Integration
+
+1. Install BlenderMCP addon (`blender_mcp.py`) in Blender
+2. In Blender sidebar (N key) → BlenderMCP tab:
+   - Check "Use Tencent Hunyuan 3D model generation"
+   - Mode: **LOCAL_API**
+   - API URL: `http://localhost:8081`
+3. Click "Connect to Claude"
+4. Ask AI to generate a 3D model
+
+### Troubleshooting
+
+**DLL load failed (custom_rasterizer_kernel)**
+
+```powershell
+# Ensure CUDA 13.2 is first in PATH and torch libs are findable
+$env:CUDA_PATH = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2"
+$env:Path = "G:\GitHub\Hunyuan3D-2.1\.venv\Lib\site-packages\torch\lib;$env:Path"
+```
+
+**CUDA version mismatch when building**
+
+```powershell
+# Ensure CUDA_PATH points to 13.2, not 12.5
+$env:CUDA_PATH = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2"
+```
+
+**Model file not found**
+
+Model auto-downloads on first start (~6.86GB). Manual download:
+```powershell
+.venv\Scripts\python.exe -c "from huggingface_hub import hf_hub_download; hf_hub_download('tencent/Hunyuan3D-2.1', 'hunyuan3d-dit-v2-1/model.fp16.ckpt', local_dir=r'$env:USERPROFILE\.cache\hy3dgen\tencent\Hunyuan3D-2.1')"
+```
+
+**Texture generation requires Blender (bpy)**
+
+The `DifferentiableRenderer` extension depends on `bpy` (Blender Python API) which is not available in standalone Python. Shape-only generation works without it; the server falls back to untextured mesh automatically.
+
+**MSVC narrowing errors (C2398) when building**
+
+If building on a newer MSVC toolchain, add these flags in `setup.py`:
+```python
+extra_compile_args={"cxx": ["/Zc:preprocessor", "/wd2398", "/wd4267"],
+                    "nvcc": ["-Xcompiler=/Zc:preprocessor", "-Xcompiler", "/wd2398"]}
+```
+
 ## Star History
 
 <a href="https://star-history.com/#Tencent-Hunyuan/Hunyuan3D-2.1&Date">
