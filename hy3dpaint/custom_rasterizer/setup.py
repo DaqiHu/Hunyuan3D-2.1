@@ -25,6 +25,8 @@ custom_rasterizer_module = CUDAExtension(
         "lib/custom_rasterizer_kernel/grid_neighbor.cpp",
         "lib/custom_rasterizer_kernel/rasterizer_gpu.cu",
     ],
+    extra_compile_args={"cxx": ["/Zc:preprocessor", "/wd2398", "/wd4267"],
+                        "nvcc": ["-Xcompiler=/Zc:preprocessor", "-Xcompiler", "/wd2398"]},
 )
 
 setup(
@@ -38,3 +40,4 @@ setup(
     ],
     cmdclass={"build_ext": BuildExtension},
 )
+
